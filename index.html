@@ -1,0 +1,1858 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASCII & Dot-Matrix Logo Animator</title>
+    <meta name="description" content="Автономный генератор интерактивной ASCII и Dot-Matrix анимации логотипов в стиле macOS Sonoma / Sequoia." />
+    <meta property="og:title" content="ASCII & Dot-Matrix Logo Animator (macOS Style)" />
+    <meta property="og:description" content="Интерактивная ASCII и Dot-Matrix анимация логотипов с синусоидальными волнами в дизайне macOS." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231c1c1e'/><text x='50%' y='67%' font-family='-apple-system, system-ui' font-weight='700' font-size='56' fill='%230A84FF' text-anchor='middle'>⌘</text></svg>" />
+
+    <style>
+      :root {
+        /* macOS Dark Mode System Colors */
+        --mac-window-bg: #1e1e20;
+        --mac-sidebar-bg: rgba(36, 36, 42, 0.78);
+        --mac-content-bg: #141416;
+        --mac-card-bg: rgba(255, 255, 255, 0.045);
+        --mac-card-hover: rgba(255, 255, 255, 0.075);
+        --mac-input-bg: rgba(0, 0, 0, 0.28);
+        --mac-border-subtle: rgba(255, 255, 255, 0.08);
+        --mac-border-divider: rgba(255, 255, 255, 0.06);
+        --mac-border-focus: #0a84ff;
+        
+        /* macOS System Text Labels */
+        --mac-label-primary: #ffffff;
+        --mac-label-secondary: rgba(235, 235, 245, 0.65);
+        --mac-label-tertiary: rgba(235, 235, 245, 0.42);
+        --mac-label-quaternary: rgba(235, 235, 245, 0.22);
+        
+        /* macOS System Accents */
+        --mac-accent-blue: #0a84ff;
+        --mac-accent-blue-hover: #0071e3;
+        --mac-accent-green: #30d158;
+        --mac-accent-red: #ff453a;
+        --mac-accent-yellow: #ffd60a;
+        --mac-accent-purple: #bf5af2;
+        --mac-accent-cyan: #64d2ff;
+        
+        /* Traffic lights */
+        --traffic-close: #ff5f57;
+        --traffic-close-border: #e0443e;
+        --traffic-min: #febc2e;
+        --traffic-min-border: #d89e24;
+        --traffic-max: #28c840;
+        --traffic-max-border: #1aab29;
+        
+        /* Radii & Shadows */
+        --mac-radius-window: 14px;
+        --mac-radius-card: 10px;
+        --mac-radius-sm: 6px;
+        --mac-radius-pill: 9999px;
+        --mac-shadow-window: 0 30px 90px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.12);
+        --mac-shadow-popover: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        --mac-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.25);
+        
+        /* Typography */
+        --font-mac: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        --font-mono: "SF Mono", Monaco, Menlo, Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-mac);
+        background: radial-gradient(circle at 50% 15%, #2a2038 0%, #15151c 65%, #0b0b0e 100%);
+        color: var(--mac-label-primary);
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+
+      /* Hidden offscreen canvas for pixel reading */
+      #offscreen-canvas {
+        display: none;
+        position: absolute;
+        pointer-events: none;
+      }
+
+      /* macOS Window Frame */
+      .macos-window {
+        width: 100%;
+        height: 100%;
+        max-width: 1560px;
+        max-height: 980px;
+        background-color: var(--mac-window-bg);
+        border-radius: var(--mac-radius-window);
+        box-shadow: var(--mac-shadow-window);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      /* macOS Unified Titlebar */
+      .macos-titlebar {
+        height: 48px;
+        min-height: 48px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%), var(--mac-window-bg);
+        border-bottom: 1px solid var(--mac-border-divider);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        position: relative;
+        z-index: 30;
+      }
+
+      /* Traffic Lights */
+      .traffic-lights {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 80px;
+      }
+
+      .traffic-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        position: relative;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.15s ease;
+      }
+
+      .traffic-close {
+        background-color: var(--traffic-close);
+        border: 0.5px solid var(--traffic-close-border);
+      }
+      .traffic-min {
+        background-color: var(--traffic-min);
+        border: 0.5px solid var(--traffic-min-border);
+      }
+      .traffic-max {
+        background-color: var(--traffic-max);
+        border: 0.5px solid var(--traffic-max-border);
+      }
+
+      .traffic-dot::before {
+        content: "";
+        opacity: 0;
+        transition: opacity 0.12s ease;
+      }
+
+      .traffic-lights:hover .traffic-close::before {
+        content: "×";
+        color: #4d0000;
+        font-size: 10px;
+        font-weight: 900;
+        opacity: 0.8;
+      }
+      .traffic-lights:hover .traffic-min::before {
+        content: "–";
+        color: #533300;
+        font-size: 10px;
+        font-weight: 900;
+        opacity: 0.8;
+        transform: translateY(-1px);
+      }
+      .traffic-lights:hover .traffic-max::before {
+        content: "+";
+        color: #023600;
+        font-size: 9px;
+        font-weight: 900;
+        opacity: 0.8;
+      }
+
+      /* Titlebar Centered Document Title */
+      .titlebar-center {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+
+      .titlebar-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        background: linear-gradient(135deg, var(--mac-accent-blue) 0%, #5e5ce6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      }
+
+      .titlebar-text {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--mac-label-primary);
+        letter-spacing: -0.01em;
+      }
+
+      .titlebar-sub {
+        font-size: 11px;
+        color: var(--mac-label-tertiary);
+        margin-left: 2px;
+      }
+
+      /* Titlebar Right Actions */
+      .titlebar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mac-btn-icon {
+        height: 28px;
+        padding: 0 10px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--mac-radius-sm);
+        color: var(--mac-label-secondary);
+        font-size: 12px;
+        font-family: var(--font-mac);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+      }
+
+      .mac-btn-icon:hover {
+        background: rgba(255, 255, 255, 0.14);
+        color: var(--mac-label-primary);
+      }
+
+      .mac-btn-icon:active {
+        transform: scale(0.97);
+      }
+
+      /* Window Body (Sidebar + Content Stage) */
+      .macos-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* macOS Sidebar */
+      .sidebar {
+        width: 380px;
+        min-width: 340px;
+        max-width: 420px;
+        background-color: var(--mac-sidebar-bg);
+        backdrop-filter: blur(40px) saturate(180%);
+        -webkit-backdrop-filter: blur(40px) saturate(180%);
+        border-right: 1px solid var(--mac-border-divider);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 16px 16px 24px;
+        gap: 16px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.12) transparent;
+        z-index: 20;
+      }
+
+      .sidebar::-webkit-scrollbar {
+        width: 5px;
+      }
+      .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.12);
+        border-radius: 4px;
+      }
+
+      /* macOS Inset Group / Section */
+      .control-group {
+        background-color: var(--mac-card-bg);
+        border: 1px solid var(--mac-border-subtle);
+        border-radius: var(--mac-radius-card);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: background 0.15s ease;
+      }
+
+      .control-group:hover {
+        background-color: var(--mac-card-hover);
+      }
+
+      .group-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--mac-label-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: var(--mac-radius-pill);
+        background-color: rgba(10, 132, 255, 0.18);
+        color: var(--mac-accent-cyan);
+        font-family: var(--font-mono);
+        font-weight: 600;
+      }
+
+      /* macOS Drop Zone */
+      .drop-zone {
+        border: 1.5px dashed rgba(255, 255, 255, 0.16);
+        border-radius: var(--mac-radius-sm);
+        padding: 16px 12px;
+        text-align: center;
+        background-color: var(--mac-input-bg);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .drop-zone:hover, .drop-zone.dragover {
+        border-color: var(--mac-accent-blue);
+        background-color: rgba(10, 132, 255, 0.12);
+      }
+
+      .drop-zone svg {
+        width: 26px;
+        height: 26px;
+        stroke: var(--mac-accent-blue);
+      }
+
+      .drop-zone-text {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--mac-label-primary);
+      }
+
+      .drop-zone-sub {
+        font-size: 11px;
+        color: var(--mac-label-tertiary);
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      /* Presets Row */
+      .presets-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .btn-sm {
+        flex: 1;
+        padding: 6px 8px;
+        background-color: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--mac-radius-sm);
+        color: var(--mac-label-secondary);
+        font-size: 11.5px;
+        font-family: var(--font-mac);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+
+      .btn-sm:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: var(--mac-label-primary);
+      }
+
+      .btn-sm:active {
+        transform: scale(0.97);
+      }
+
+      /* Field Controls */
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .field-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--mac-label-secondary);
+      }
+
+      .field-value {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--mac-accent-cyan);
+        background: rgba(0, 0, 0, 0.35);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--mac-border-subtle);
+      }
+
+      /* macOS Native Select */
+      select {
+        width: 100%;
+        background-color: var(--mac-input-bg);
+        color: var(--mac-label-primary);
+        border: 1px solid var(--mac-border-subtle);
+        border-radius: var(--mac-radius-sm);
+        padding: 7px 10px;
+        font-size: 12px;
+        font-family: var(--font-mac);
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      select:focus {
+        border-color: var(--mac-border-focus);
+        box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+      }
+
+      /* macOS Native Range Slider */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+        transition: transform 0.1s ease;
+      }
+
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        border: 0.5px solid rgba(0,0,0,0.2);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+      }
+
+      /* macOS Segmented Picker Control */
+      .segmented-control {
+        display: flex;
+        background-color: rgba(0, 0, 0, 0.3);
+        border-radius: var(--mac-radius-sm);
+        padding: 2px;
+        border: 1px solid var(--mac-border-subtle);
+        gap: 2px;
+      }
+
+      .segmented-btn {
+        flex: 1;
+        padding: 5px 6px;
+        font-size: 11px;
+        font-family: var(--font-mac);
+        font-weight: 500;
+        text-align: center;
+        background: transparent;
+        color: var(--mac-label-secondary);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+      }
+
+      .segmented-btn:hover {
+        color: var(--mac-label-primary);
+      }
+
+      .segmented-btn.active {
+        background-color: rgba(255, 255, 255, 0.2);
+        color: var(--mac-label-primary);
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Color Picker macOS Box */
+      .color-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .color-picker-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: var(--mac-input-bg);
+        border: 1px solid var(--mac-border-subtle);
+        border-radius: var(--mac-radius-sm);
+        padding: 6px 8px;
+      }
+
+      .color-picker-box input[type="color"] {
+        -webkit-appearance: none;
+        border: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        cursor: pointer;
+        background: transparent;
+      }
+
+      .color-picker-box input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+
+      .color-picker-box input[type="color"]::-webkit-color-swatch {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 5px;
+      }
+
+      .color-picker-label {
+        font-size: 11px;
+        color: var(--mac-label-secondary);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .color-hex {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--mac-label-tertiary);
+      }
+
+      /* macOS Switch */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .toggle-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--mac-label-secondary);
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 38px;
+        height: 22px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.16);
+        transition: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        border-radius: 22px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        bottom: 2px;
+        background-color: #ffffff;
+        transition: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      }
+
+      input:checked + .slider {
+        background-color: var(--mac-accent-green);
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(16px);
+      }
+
+      /* macOS Export Action Button */
+      .export-btn {
+        width: 100%;
+        padding: 10px 16px;
+        background: linear-gradient(180deg, #1f94ff 0%, #0077e6 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--mac-radius-sm);
+        color: #ffffff;
+        font-size: 12.5px;
+        font-family: var(--font-mac);
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 6px rgba(10, 132, 255, 0.35);
+      }
+
+      .export-btn:hover {
+        background: linear-gradient(180deg, #33a1ff 0%, #0a84ff 100%);
+        box-shadow: 0 3px 8px rgba(10, 132, 255, 0.5);
+      }
+
+      .export-btn:active {
+        transform: scale(0.98);
+      }
+
+      .export-btn.recording {
+        background: linear-gradient(180deg, #ff453a 0%, #d70015 100%);
+        box-shadow: 0 0 16px rgba(255, 69, 58, 0.4);
+        animation: macPulseRecord 1.5s infinite;
+      }
+
+      @keyframes macPulseRecord {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.86; }
+      }
+
+      .record-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #ffffff;
+      }
+
+      .export-btn.recording .record-dot {
+        animation: macBlink 1s infinite;
+      }
+
+      @keyframes macBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.2; }
+      }
+
+      /* Stage Area (Canvas Workspace) */
+      .stage-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--mac-content-bg);
+        background-image: 
+          radial-gradient(circle at 50% 50%, rgba(10, 132, 255, 0.04) 0%, transparent 60%),
+          radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        background-size: 100% 100%, 24px 24px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* macOS Floating HUD Pill */
+      .stage-toolbar {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 10;
+      }
+
+      .hud-pill {
+        background-color: rgba(30, 30, 36, 0.82);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid var(--mac-border-subtle);
+        padding: 5px 12px;
+        border-radius: var(--mac-radius-pill);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--mac-label-secondary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      }
+
+      .hud-pill .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: var(--mac-accent-green);
+        box-shadow: 0 0 6px rgba(48, 209, 88, 0.6);
+      }
+
+      .hud-btn {
+        background-color: rgba(30, 30, 36, 0.82);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid var(--mac-border-subtle);
+        color: var(--mac-label-secondary);
+        padding: 5px 12px;
+        border-radius: var(--mac-radius-pill);
+        font-size: 11.5px;
+        font-family: var(--font-mac);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      }
+
+      .hud-btn:hover {
+        color: var(--mac-label-primary);
+        background-color: rgba(45, 45, 55, 0.9);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .hud-btn:active {
+        transform: scale(0.96);
+      }
+
+      /* Main Stage Canvas Container */
+      .canvas-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        position: relative;
+      }
+
+      #stage {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: var(--mac-radius-card);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+        image-rendering: pixelated;
+      }
+
+      /* Mobile Drawer Toggle */
+      .mobile-toggle {
+        display: none;
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        z-index: 30;
+        background: var(--mac-accent-blue);
+        color: #ffffff;
+        border: none;
+        border-radius: var(--mac-radius-pill);
+        padding: 9px 18px;
+        font-weight: 600;
+        font-size: 12.5px;
+        box-shadow: 0 4px 20px rgba(10, 132, 255, 0.4);
+        cursor: pointer;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          padding: 0;
+        }
+        .macos-window {
+          border-radius: 0;
+          max-width: 100%;
+          max-height: 100%;
+          border: none;
+        }
+        .sidebar {
+          position: fixed;
+          top: 48px;
+          left: 0;
+          bottom: 0;
+          width: 88%;
+          max-width: 360px;
+          transform: translateX(-100%);
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          border-right: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .mobile-toggle {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hidden Canvas for pixel analysis -->
+    <canvas id="offscreen-canvas"></canvas>
+
+    <!-- macOS Desktop Window Frame -->
+    <div class="macos-window" id="app">
+      <!-- macOS Unified Titlebar -->
+      <header class="macos-titlebar">
+        <!-- Traffic lights -->
+        <div class="traffic-lights">
+          <div class="traffic-dot traffic-close" title="Закрыть"></div>
+          <div class="traffic-dot traffic-min" title="Свернуть"></div>
+          <div class="traffic-dot traffic-max" title="Развернуть"></div>
+        </div>
+
+        <!-- Document center indicator -->
+        <div class="titlebar-center">
+          <div class="titlebar-icon">⌘</div>
+          <span class="titlebar-text">ASCII & Dot-Matrix Animator</span>
+          <span class="titlebar-sub">— Sequoia Dark</span>
+        </div>
+
+        <!-- Titlebar right controls -->
+        <div class="titlebar-actions">
+          <button class="mac-btn-icon" id="btn-quick-reset" title="Сбросить все параметры">
+            ↺ Сброс
+          </button>
+        </div>
+      </header>
+
+      <!-- macOS Body (Sidebar + Content Workspace) -->
+      <div class="macos-body">
+        <!-- Sidebar Settings Panel -->
+        <aside class="sidebar" id="sidebar">
+          <!-- 1. Source Logo Upload -->
+          <div class="control-group">
+            <div class="group-title">
+              <span>1. Исходный логотип</span>
+              <span class="badge" id="source-status">DEMO SVG</span>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <div class="drop-zone-text">Перетащите логотип сюда</div>
+              <div class="drop-zone-sub">PNG, JPG, SVG, WebP или клик для выбора</div>
+              <input type="file" id="file-input" class="file-input" accept="image/png, image/jpeg, image/svg+xml, image/webp" />
+            </div>
+
+            <div class="presets-row">
+              <button class="btn-sm" id="preset-cyber">◈ Кибер</button>
+              <button class="btn-sm" id="preset-text">⌘ AI Core</button>
+              <button class="btn-sm" id="preset-globe">◎ Сфера</button>
+            </div>
+          </div>
+
+          <!-- 2. Symbol & Resolution -->
+          <div class="control-group">
+            <div class="group-title">
+              <span>2. Режим символов</span>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="symbol-mode">Тип рендеринга</label>
+              <select id="symbol-mode">
+                <option value="ascii">ASCII Градиент (@#S%*+;:,. )</option>
+                <option value="dots">Dot-Matrix (Точки)</option>
+                <option value="binary">Binary (01 Двоичный)</option>
+                <option value="matrix">Matrix Code (Katakana/Hex)</option>
+                <option value="minimal">Минималистичный (■▲●+·)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="grid-resolution">Разрешение сетки (Колонки)</label>
+                <span class="field-value" id="val-resolution">64</span>
+              </div>
+              <input type="range" id="grid-resolution" min="24" max="120" step="2" value="64" />
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="font-size">Размер символов / точек</label>
+                <span class="field-value" id="val-font-size">14px</span>
+              </div>
+              <input type="range" id="font-size" min="8" max="28" step="1" value="14" />
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="brightness-thresh">Порог отсечения фона</label>
+                <span class="field-value" id="val-thresh">12%</span>
+              </div>
+              <input type="range" id="brightness-thresh" min="0" max="80" step="1" value="12" />
+            </div>
+          </div>
+
+          <!-- 3. Wave & Dynamics -->
+          <div class="control-group">
+            <div class="group-title">
+              <span>3. Волновые искажения</span>
+            </div>
+
+            <div class="field">
+              <label class="field-label">Направление волны</label>
+              <div class="segmented-control" id="wave-direction">
+                <button class="segmented-btn active" data-dir="horizontal">Горизонт</button>
+                <button class="segmented-btn" data-dir="vertical">Вертикаль</button>
+                <button class="segmented-btn" data-dir="diagonal">Диагональ</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="wave-amp-x">Амплитуда X</label>
+                <span class="field-value" id="val-amp-x">16</span>
+              </div>
+              <input type="range" id="wave-amp-x" min="0" max="60" step="1" value="16" />
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="wave-amp-y">Амплитуда Y</label>
+                <span class="field-value" id="val-amp-y">14</span>
+              </div>
+              <input type="range" id="wave-amp-y" min="0" max="60" step="1" value="14" />
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="wave-freq">Частота (Freq)</label>
+                <span class="field-value" id="val-freq">0.05</span>
+              </div>
+              <input type="range" id="wave-freq" min="0.01" max="0.25" step="0.01" value="0.05" />
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <label for="anim-speed">Скорость анимации</label>
+                <span class="field-value" id="val-speed">1.4x</span>
+              </div>
+              <input type="range" id="anim-speed" min="0.1" max="4.0" step="0.1" value="1.4" />
+            </div>
+          </div>
+
+          <!-- 4. Visual Styles -->
+          <div class="control-group">
+            <div class="group-title">
+              <span>4. Цвета и палитра</span>
+            </div>
+
+            <div class="color-grid">
+              <div class="color-picker-box">
+                <input type="color" id="color-text" value="#00f0ff" />
+                <div class="color-picker-label">
+                  <span>Символы</span>
+                  <span class="color-hex" id="hex-text">#00F0FF</span>
+                </div>
+              </div>
+
+              <div class="color-picker-box">
+                <input type="color" id="color-bg" value="#0a0c10" />
+                <div class="color-picker-label">
+                  <span>Фон Canvas</span>
+                  <span class="color-hex" id="hex-bg">#0A0C10</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label">Сохранять цвета логотипа</span>
+              <label class="switch">
+                <input type="checkbox" id="toggle-orig-colors" />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label">Инвертировать яркость</span>
+              <label class="switch">
+                <input type="checkbox" id="toggle-invert" />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <span class="toggle-label">Неоновое свечение (Bloom)</span>
+              <label class="switch">
+                <input type="checkbox" id="toggle-glow" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 5. Export WebM -->
+          <div class="control-group">
+            <div class="group-title">
+              <span>5. Экспорт анимации</span>
+              <span class="badge" id="recorder-badge">60 FPS</span>
+            </div>
+
+            <button class="export-btn" id="record-btn">
+              <span class="record-dot"></span>
+              <span id="record-btn-text">Записать WebM видео</span>
+            </button>
+
+            <div class="presets-row">
+              <button class="btn-sm" id="btn-snapshot">📸 Снимок PNG</button>
+              <button class="btn-sm" id="btn-reset-wave">↺ Сброс волн</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main Stage Workspace -->
+        <main class="stage-wrapper">
+          <!-- macOS Floating HUD Controls -->
+          <div class="stage-toolbar">
+            <div class="hud-pill">
+              <span class="dot"></span>
+              <span id="hud-fps">60 FPS</span>
+            </div>
+            <div class="hud-pill" id="hud-particles">0 частиц</div>
+            <button class="hud-btn" id="btn-pause-play">⏸ Пауза</button>
+          </div>
+
+          <!-- Render Canvas Container -->
+          <div class="canvas-container" id="canvas-container">
+            <canvas id="stage"></canvas>
+          </div>
+
+          <button class="mobile-toggle" id="mobile-sidebar-toggle">⚙ Инспектор</button>
+        </main>
+      </div>
+    </div>
+
+    <!-- Vanilla ES6+ JavaScript Application -->
+    <script>
+      /**
+       * ASCII & Dot-Matrix Logo Animator - macOS Edition
+       * Completely autonomous vanilla JS ES6+ architecture
+       * Zero external dependencies, pure HTML5/CSS3/Vanilla JS.
+       */
+
+      // ==========================================
+      // 1. ImageProcessor Class
+      // ==========================================
+      class ImageProcessor {
+        constructor(offscreenCanvas) {
+          this.canvas = offscreenCanvas;
+          this.ctx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+          this.currentImage = null;
+        }
+
+        async loadFromFile(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                this.currentImage = img;
+                resolve(img);
+              };
+              img.onerror = (err) => reject(err);
+              img.src = event.target.result;
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+          });
+        }
+
+        async loadPreset(type = 'cyber') {
+          return new Promise((resolve) => {
+            const svgWidth = 400;
+            const svgHeight = 400;
+            let svgMarkup = '';
+
+            if (type === 'cyber') {
+              svgMarkup = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 400 400">
+                  <rect width="400" height="400" fill="#000000"/>
+                  <polygon points="200,40 350,120 350,280 200,360 50,280 50,120" fill="none" stroke="#ffffff" stroke-width="14"/>
+                  <polygon points="200,90 305,150 305,250 200,310 95,250 95,150" fill="#ffffff" fill-opacity="0.3" stroke="#ffffff" stroke-width="8"/>
+                  <polygon points="200,140 260,175 260,225 200,260 140,225 140,175" fill="#ffffff"/>
+                  <circle cx="200" cy="200" r="22" fill="#000000"/>
+                  <line x1="200" y1="40" x2="200" y2="90" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="200" y1="310" x2="200" y2="360" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="50" y1="120" x2="95" y2="150" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="350" y1="120" x2="305" y2="150" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="50" y1="280" x2="95" y2="250" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="350" y1="280" x2="305" y2="250" stroke="#ffffff" stroke-width="8"/>
+                </svg>
+              `;
+            } else if (type === 'text') {
+              svgMarkup = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 400 400">
+                  <rect width="400" height="400" fill="#000000"/>
+                  <text x="200" y="180" font-family="-apple-system, system-ui, sans-serif" font-weight="900" font-size="110" fill="#ffffff" text-anchor="middle">AI</text>
+                  <text x="200" y="270" font-family="-apple-system, system-ui, sans-serif" font-weight="800" font-size="52" fill="#ffffff" letter-spacing="10" text-anchor="middle">CORE</text>
+                  <circle cx="200" cy="200" r="160" fill="none" stroke="#ffffff" stroke-width="12" stroke-dasharray="24 16"/>
+                </svg>
+              `;
+            } else {
+              svgMarkup = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 400 400">
+                  <rect width="400" height="400" fill="#000000"/>
+                  <circle cx="200" cy="200" r="140" fill="none" stroke="#ffffff" stroke-width="10"/>
+                  <ellipse cx="200" cy="200" rx="140" ry="60" fill="none" stroke="#ffffff" stroke-width="8"/>
+                  <ellipse cx="200" cy="200" rx="60" ry="140" fill="none" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="60" y1="200" x2="340" y2="200" stroke="#ffffff" stroke-width="8"/>
+                  <line x1="200" y1="60" x2="200" y2="340" stroke="#ffffff" stroke-width="8"/>
+                </svg>
+              `;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+              this.currentImage = img;
+              resolve(img);
+            };
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+          });
+        }
+
+        sampleGrid(cols, rows, invert = false) {
+          if (!this.currentImage) return null;
+
+          this.canvas.width = cols;
+          this.canvas.height = rows;
+
+          this.ctx.clearRect(0, 0, cols, rows);
+
+          const imgWidth = this.currentImage.naturalWidth || this.currentImage.width;
+          const imgHeight = this.currentImage.naturalHeight || this.currentImage.height;
+          const imgAspect = imgWidth / imgHeight;
+          const gridAspect = cols / rows;
+
+          let drawW = cols;
+          let drawH = rows;
+          let drawX = 0;
+          let drawY = 0;
+
+          if (imgAspect > gridAspect) {
+            drawW = cols;
+            drawH = cols / imgAspect;
+            drawY = (rows - drawH) / 2;
+          } else {
+            drawH = rows;
+            drawW = rows * imgAspect;
+            drawX = (cols - drawW) / 2;
+          }
+
+          this.ctx.drawImage(this.currentImage, drawX, drawY, drawW, drawH);
+
+          const imgData = this.ctx.getImageData(0, 0, cols, rows);
+          const pixels = imgData.data;
+          const gridData = [];
+
+          for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+              const idx = (y * cols + x) * 4;
+              const r = pixels[idx];
+              const g = pixels[idx + 1];
+              const b = pixels[idx + 2];
+              const a = pixels[idx + 3] / 255;
+
+              let luminance = (0.299 * r + 0.587 * g + 0.114 * b) * a;
+
+              if (invert) {
+                luminance = 255 - luminance;
+              }
+
+              gridData.push({
+                gx: x,
+                gy: y,
+                luminance: Math.max(0, Math.min(255, luminance)),
+                r,
+                g,
+                b,
+                a
+              });
+            }
+          }
+
+          return gridData;
+        }
+      }
+
+      // ==========================================
+      // 2. ParticleGridSystem Class
+      // ==========================================
+      class ParticleGridSystem {
+        constructor() {
+          this.particles = [];
+          this.cols = 64;
+          this.rows = 64;
+          this.cellWidth = 14;
+          this.cellHeight = 14;
+
+          this.charSets = {
+            ascii: "@#S%*+;:,. ".split(""),
+            dots: ["●", "•", "·"],
+            binary: ["1", "0"],
+            matrix: "ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ1098765432X".split(""),
+            minimal: ["■", "▲", "●", "+", "·", " "]
+          };
+        }
+
+        build(gridData, cols, rows, stageWidth, stageHeight, config) {
+          this.cols = cols;
+          this.rows = rows;
+          this.particles = [];
+
+          this.cellWidth = stageWidth / cols;
+          this.cellHeight = stageHeight / rows;
+
+          const thresh = (config.threshold / 100) * 255;
+          const charSet = this.charSets[config.symbolMode] || this.charSets.ascii;
+
+          for (let i = 0; i < gridData.length; i++) {
+            const pt = gridData[i];
+
+            if (pt.luminance <= thresh && pt.a < 0.1) {
+              continue;
+            }
+
+            const norm = pt.luminance / 255;
+            let char = " ";
+
+            if (config.symbolMode === 'dots') {
+              char = "●";
+            } else {
+              const charIndex = Math.min(
+                charSet.length - 1,
+                Math.floor((1 - norm) * charSet.length)
+              );
+              char = charSet[charIndex];
+            }
+
+            const origX = (pt.gx + 0.5) * this.cellWidth;
+            const origY = (pt.gy + 0.5) * this.cellHeight;
+
+            this.particles.push({
+              origX,
+              origY,
+              x: origX,
+              y: origY,
+              luminance: pt.luminance,
+              norm,
+              char,
+              r: pt.r,
+              g: pt.g,
+              b: pt.b,
+              a: pt.a
+            });
+          }
+        }
+      }
+
+      // ==========================================
+      // 3. AnimationEngine Class
+      // ==========================================
+      class AnimationEngine {
+        constructor(stageCanvas, particleSystem, config) {
+          this.canvas = stageCanvas;
+          this.ctx = stageCanvas.getContext('2d');
+          this.particleSystem = particleSystem;
+          this.config = config;
+          this.animationId = null;
+          this.isRunning = true;
+          this.startTime = performance.now();
+          this.lastFrameTime = performance.now();
+          this.frameCount = 0;
+          this.fps = 60;
+          this.onFpsUpdate = null;
+        }
+
+        start() {
+          if (!this.animationId) {
+            this.isRunning = true;
+            this.lastFrameTime = performance.now();
+            this.loop(this.lastFrameTime);
+          }
+        }
+
+        stop() {
+          if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+          }
+          this.isRunning = false;
+        }
+
+        togglePlay() {
+          if (this.isRunning) {
+            this.stop();
+          } else {
+            this.start();
+          }
+          return this.isRunning;
+        }
+
+        loop(currentTime) {
+          this.animationId = requestAnimationFrame((t) => this.loop(t));
+
+          if (!this.isRunning) return;
+
+          this.frameCount++;
+          if (currentTime - this.lastFrameTime >= 500) {
+            this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastFrameTime));
+            this.frameCount = 0;
+            this.lastFrameTime = currentTime;
+            if (this.onFpsUpdate) this.onFpsUpdate(this.fps);
+          }
+
+          this.render(currentTime);
+        }
+
+        render(currentTime) {
+          const ctx = this.ctx;
+          const width = this.canvas.width;
+          const height = this.canvas.height;
+          const config = this.config;
+          const particles = this.particleSystem.particles;
+
+          ctx.fillStyle = config.bgColor;
+          ctx.fillRect(0, 0, width, height);
+
+          const fontSize = config.fontSize;
+          ctx.font = `600 ${fontSize}px "SF Mono", Monaco, Menlo, Consolas, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          if (config.glow) {
+            ctx.shadowColor = config.textColor;
+            ctx.shadowBlur = 8;
+          } else {
+            ctx.shadowBlur = 0;
+          }
+
+          const t = ((currentTime - this.startTime) * 0.001) * config.speed;
+          const freq = config.waveFrequency;
+          const ampX = config.waveAmpX;
+          const ampY = config.waveAmpY;
+          const dir = config.waveDirection;
+          const isDot = config.symbolMode === 'dots';
+
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+
+            let wavePhase = 0;
+            if (dir === 'horizontal') {
+              wavePhase = p.origY * freq;
+            } else if (dir === 'vertical') {
+              wavePhase = p.origX * freq;
+            } else {
+              wavePhase = (p.origX + p.origY) * 0.7071 * freq;
+            }
+
+            const newX = p.origX + Math.sin(t + wavePhase) * ampX;
+            const newY = p.origY + Math.cos(t + wavePhase) * ampY;
+
+            if (config.useOriginalColors) {
+              const boost = Math.min(1.2, 0.4 + p.norm);
+              ctx.fillStyle = `rgba(${Math.min(255, p.r * boost)}, ${Math.min(255, p.g * boost)}, ${Math.min(255, p.b * boost)}, ${Math.max(0.2, p.norm)})`;
+            } else {
+              ctx.fillStyle = config.textColor;
+              ctx.globalAlpha = Math.max(0.18, p.norm);
+            }
+
+            if (isDot) {
+              const dotRadius = Math.max(1, (fontSize * 0.45) * p.norm);
+              ctx.beginPath();
+              ctx.arc(newX, newY, dotRadius, 0, Math.PI * 2);
+              ctx.fill();
+            } else {
+              ctx.fillText(p.char, newX, newY);
+            }
+          }
+
+          ctx.globalAlpha = 1.0;
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      // ==========================================
+      // 4. Exporter Class (MediaRecorder API)
+      // ==========================================
+      class Exporter {
+        constructor(canvas) {
+          this.canvas = canvas;
+          this.mediaRecorder = null;
+          this.recordedChunks = [];
+          this.isRecording = false;
+          this.recordTimer = null;
+          this.recordSeconds = 0;
+        }
+
+        startRecording(onTick, onComplete, onError) {
+          if (this.isRecording) return;
+
+          try {
+            const stream = this.canvas.captureStream(60);
+            let mimeType = 'video/webm;codecs=vp9';
+
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'video/webm;codecs=vp8';
+              if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm';
+              }
+            }
+
+            this.mediaRecorder = new MediaRecorder(stream, {
+              mimeType,
+              videoBitsPerSecond: 6000000
+            });
+
+            this.recordedChunks = [];
+
+            this.mediaRecorder.ondataavailable = (event) => {
+              if (event.data && event.data.size > 0) {
+                this.recordedChunks.push(event.data);
+              }
+            };
+
+            this.mediaRecorder.onstop = () => {
+              this.isRecording = false;
+              clearInterval(this.recordTimer);
+
+              const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+              const url = URL.createObjectURL(blob);
+              
+              const a = document.createElement('a');
+              a.style.display = 'none';
+              a.href = url;
+              a.download = `ascii-logo-animation-${Date.now()}.webm`;
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }, 200);
+
+              if (onComplete) onComplete();
+            };
+
+            this.mediaRecorder.start(100);
+            this.isRecording = true;
+            this.recordSeconds = 0;
+
+            this.recordTimer = setInterval(() => {
+              this.recordSeconds++;
+              if (onTick) onTick(this.recordSeconds);
+
+              if (this.recordSeconds >= 15) {
+                this.stopRecording();
+              }
+            }, 1000);
+
+          } catch (err) {
+            console.error('Recording error:', err);
+            this.isRecording = false;
+            if (onError) onError(err);
+          }
+        }
+
+        stopRecording() {
+          if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+          }
+        }
+
+        saveSnapshot() {
+          const url = this.canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `ascii-snapshot-${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => document.body.removeChild(a), 200);
+        }
+      }
+
+      // ==========================================
+      // 5. Main Application Controller
+      // ==========================================
+      class App {
+        constructor() {
+          this.stage = document.getElementById('stage');
+          this.offscreenCanvas = document.getElementById('offscreen-canvas');
+          this.container = document.getElementById('canvas-container');
+
+          this.fileInput = document.getElementById('file-input');
+          this.dropZone = document.getElementById('drop-zone');
+          this.sourceStatus = document.getElementById('source-status');
+
+          this.symbolModeSelect = document.getElementById('symbol-mode');
+          this.gridResolutionInput = document.getElementById('grid-resolution');
+          this.fontSizeInput = document.getElementById('font-size');
+          this.threshInput = document.getElementById('brightness-thresh');
+
+          this.waveDirectionBtns = document.querySelectorAll('#wave-direction .segmented-btn');
+          this.waveAmpXInput = document.getElementById('wave-amp-x');
+          this.waveAmpYInput = document.getElementById('wave-amp-y');
+          this.waveFreqInput = document.getElementById('wave-freq');
+          this.animSpeedInput = document.getElementById('anim-speed');
+
+          this.colorTextInput = document.getElementById('color-text');
+          this.colorBgInput = document.getElementById('color-bg');
+          this.hexText = document.getElementById('hex-text');
+          this.hexBg = document.getElementById('hex-bg');
+          this.toggleOrigColors = document.getElementById('toggle-orig-colors');
+          this.toggleInvert = document.getElementById('toggle-invert');
+          this.toggleGlow = document.getElementById('toggle-glow');
+
+          this.recordBtn = document.getElementById('record-btn');
+          this.recordBtnText = document.getElementById('record-btn-text');
+          this.recorderBadge = document.getElementById('recorder-badge');
+          this.btnSnapshot = document.getElementById('btn-snapshot');
+          this.btnResetWave = document.getElementById('btn-reset-wave');
+          this.btnQuickReset = document.getElementById('btn-quick-reset');
+          this.btnPausePlay = document.getElementById('btn-pause-play');
+
+          this.hudFps = document.getElementById('hud-fps');
+          this.hudParticles = document.getElementById('hud-particles');
+
+          this.presetCyber = document.getElementById('preset-cyber');
+          this.presetText = document.getElementById('preset-text');
+          this.presetGlobe = document.getElementById('preset-globe');
+
+          this.mobileToggle = document.getElementById('mobile-sidebar-toggle');
+          this.sidebar = document.getElementById('sidebar');
+
+          this.config = {
+            symbolMode: 'ascii',
+            gridCols: 64,
+            fontSize: 14,
+            threshold: 12,
+            waveDirection: 'horizontal',
+            waveAmpX: 16,
+            waveAmpY: 14,
+            waveFrequency: 0.05,
+            speed: 1.4,
+            textColor: '#00f0ff',
+            bgColor: '#0a0c10',
+            useOriginalColors: false,
+            invertLuminance: false,
+            glow: true
+          };
+
+          this.imageProcessor = new ImageProcessor(this.offscreenCanvas);
+          this.gridSystem = new ParticleGridSystem();
+          this.engine = new AnimationEngine(this.stage, this.gridSystem, this.config);
+          this.exporter = new Exporter(this.stage);
+
+          this.init();
+        }
+
+        async init() {
+          this.setupEventListeners();
+          this.resizeStage();
+
+          window.addEventListener('resize', () => {
+            this.resizeStage();
+            this.rebuildGrid();
+          });
+
+          this.engine.onFpsUpdate = (fps) => {
+            this.hudFps.textContent = `${fps} FPS`;
+          };
+
+          await this.imageProcessor.loadPreset('cyber');
+          this.rebuildGrid();
+          this.engine.start();
+        }
+
+        resizeStage() {
+          const rect = this.container.getBoundingClientRect();
+          const padding = 32;
+          const maxW = Math.max(280, rect.width - padding);
+          const maxH = Math.max(280, rect.height - padding);
+
+          const size = Math.min(maxW, maxH, 820);
+          this.stage.width = size;
+          this.stage.height = size;
+        }
+
+        rebuildGrid() {
+          const cols = this.config.gridCols;
+          const rows = Math.round(cols * (this.stage.height / this.stage.width));
+
+          const gridData = this.imageProcessor.sampleGrid(cols, rows, this.config.invertLuminance);
+          if (!gridData) return;
+
+          this.gridSystem.build(
+            gridData,
+            cols,
+            rows,
+            this.stage.width,
+            this.stage.height,
+            this.config
+          );
+
+          this.hudParticles.textContent = `${this.gridSystem.particles.length} символов`;
+        }
+
+        setupEventListeners() {
+          // File upload & Drop zone
+          this.dropZone.addEventListener('click', () => this.fileInput.click());
+          this.fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              try {
+                this.sourceStatus.textContent = file.name.slice(0, 10) + '..';
+                await this.imageProcessor.loadFromFile(file);
+                this.rebuildGrid();
+              } catch (err) {
+                alert('Не удалось прочитать файл изображения: ' + err.message);
+              }
+            }
+          });
+
+          this.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.dropZone.classList.add('dragover');
+          });
+
+          this.dropZone.addEventListener('dragleave', () => {
+            this.dropZone.classList.remove('dragover');
+          });
+
+          this.dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            this.dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+              this.sourceStatus.textContent = file.name.slice(0, 10) + '..';
+              await this.imageProcessor.loadFromFile(file);
+              this.rebuildGrid();
+            }
+          });
+
+          // Presets
+          this.presetCyber.addEventListener('click', async () => {
+            this.sourceStatus.textContent = 'DEMO SVG';
+            await this.imageProcessor.loadPreset('cyber');
+            this.rebuildGrid();
+          });
+          this.presetText.addEventListener('click', async () => {
+            this.sourceStatus.textContent = 'AI CORE';
+            await this.imageProcessor.loadPreset('text');
+            this.rebuildGrid();
+          });
+          this.presetGlobe.addEventListener('click', async () => {
+            this.sourceStatus.textContent = 'СФЕРА';
+            await this.imageProcessor.loadPreset('globe');
+            this.rebuildGrid();
+          });
+
+          // Symbol & Resolution
+          this.symbolModeSelect.addEventListener('change', (e) => {
+            this.config.symbolMode = e.target.value;
+            this.rebuildGrid();
+          });
+
+          this.gridResolutionInput.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.config.gridCols = val;
+            document.getElementById('val-resolution').textContent = val;
+            this.rebuildGrid();
+          });
+
+          this.fontSizeInput.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.config.fontSize = val;
+            document.getElementById('val-font-size').textContent = val + 'px';
+          });
+
+          this.threshInput.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.config.threshold = val;
+            document.getElementById('val-thresh').textContent = val + '%';
+            this.rebuildGrid();
+          });
+
+          // Wave Controls
+          this.waveDirectionBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+              this.waveDirectionBtns.forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              this.config.waveDirection = btn.getAttribute('data-dir');
+            });
+          });
+
+          this.waveAmpXInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.config.waveAmpX = val;
+            document.getElementById('val-amp-x').textContent = val;
+          });
+
+          this.waveAmpYInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.config.waveAmpY = val;
+            document.getElementById('val-amp-y').textContent = val;
+          });
+
+          this.waveFreqInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.config.waveFrequency = val;
+            document.getElementById('val-freq').textContent = val.toFixed(2);
+          });
+
+          this.animSpeedInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            this.config.speed = val;
+            document.getElementById('val-speed').textContent = val.toFixed(1) + 'x';
+          });
+
+          // Styles
+          this.colorTextInput.addEventListener('input', (e) => {
+            this.config.textColor = e.target.value;
+            this.hexText.textContent = e.target.value.toUpperCase();
+          });
+
+          this.colorBgInput.addEventListener('input', (e) => {
+            this.config.bgColor = e.target.value;
+            this.hexBg.textContent = e.target.value.toUpperCase();
+          });
+
+          this.toggleOrigColors.addEventListener('change', (e) => {
+            this.config.useOriginalColors = e.target.checked;
+          });
+
+          this.toggleInvert.addEventListener('change', (e) => {
+            this.config.invertLuminance = e.target.checked;
+            this.rebuildGrid();
+          });
+
+          this.toggleGlow.addEventListener('change', (e) => {
+            this.config.glow = e.target.checked;
+          });
+
+          // Exporter
+          this.recordBtn.addEventListener('click', () => {
+            if (this.exporter.isRecording) {
+              this.exporter.stopRecording();
+            } else {
+              this.startRecordingUI();
+            }
+          });
+
+          this.btnSnapshot.addEventListener('click', () => {
+            this.exporter.saveSnapshot();
+          });
+
+          const resetWaveParams = () => {
+            this.waveAmpXInput.value = 16;
+            this.waveAmpYInput.value = 14;
+            this.waveFreqInput.value = 0.05;
+            this.animSpeedInput.value = 1.4;
+
+            this.config.waveAmpX = 16;
+            this.config.waveAmpY = 14;
+            this.config.waveFrequency = 0.05;
+            this.config.speed = 1.4;
+
+            document.getElementById('val-amp-x').textContent = 16;
+            document.getElementById('val-amp-y').textContent = 14;
+            document.getElementById('val-freq').textContent = '0.05';
+            document.getElementById('val-speed').textContent = '1.4x';
+          };
+
+          this.btnResetWave.addEventListener('click', resetWaveParams);
+          if (this.btnQuickReset) {
+            this.btnQuickReset.addEventListener('click', resetWaveParams);
+          }
+
+          // Play / Pause
+          this.btnPausePlay.addEventListener('click', () => {
+            const isPlaying = this.engine.togglePlay();
+            this.btnPausePlay.textContent = isPlaying ? '⏸ Пауза' : '▶ Старт';
+          });
+
+          // Mobile toggle
+          if (this.mobileToggle) {
+            this.mobileToggle.addEventListener('click', () => {
+              this.sidebar.classList.toggle('open');
+            });
+          }
+        }
+
+        startRecordingUI() {
+          this.recordBtn.classList.add('recording');
+          this.recordBtnText.textContent = 'Остановить запись (00:00)';
+          this.recorderBadge.textContent = 'REC ⏺';
+
+          this.exporter.startRecording(
+            (sec) => {
+              const formatted = `00:${sec < 10 ? '0' + sec : sec}`;
+              this.recordBtnText.textContent = `Остановить (${formatted})`;
+            },
+            () => {
+              this.recordBtn.classList.remove('recording');
+              this.recordBtnText.textContent = 'Записать WebM видео';
+              this.recorderBadge.textContent = 'Готово ✓';
+              setTimeout(() => {
+                this.recorderBadge.textContent = '60 FPS';
+              }, 3000);
+            },
+            (err) => {
+              this.recordBtn.classList.remove('recording');
+              this.recordBtnText.textContent = 'Записать WebM видео';
+              this.recorderBadge.textContent = 'Ошибка';
+              alert('Ошибка экспорта видео: ' + err.message);
+            }
+          );
+        }
+      }
+
+      window.addEventListener('DOMContentLoaded', () => {
+        new App();
+      });
+    </script>
+  </body>
+</html>

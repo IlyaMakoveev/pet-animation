@@ -1,0 +1,6 @@
+{
+  "name": "ASCII & Dot-Matrix Logo Animator",
+  "description": "Автономный генератор интерактивной ASCII и Dot-Matrix анимации логотипов с волновыми искажениями и экспортом WebM видео.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
